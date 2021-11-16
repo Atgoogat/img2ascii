@@ -9,13 +9,9 @@ import (
 )
 
 func main() {
-	empty := ""
-	args := cli.ParseArguments(cli.CliArguments{
-		Filepaths:      []string{},
-		OutputFilename: &empty,
-		Scale:          1,
-	})
+	args := cli.ParseArguments()
 
+	cleanArguments(&args)
 	err := validateArguments(args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -45,7 +41,11 @@ func main() {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Could not decode image: %s\n", filepath)
 		}
-		img = imgprocessing.ResizeScale(img, args.Scale)
+		if args.Scale != nil {
+			img = imgprocessing.ResizeScale(img, *args.Scale)
+		} else {
+			img = imgprocessing.ResizeScaleXY(img, *args.ScaleX, *args.ScaleY)
+		}
 		grayImg := imgprocessing.Img2Gray(img)
 
 		ascii, _ := imgprocessing.Convert(grayImg, imgprocessing.DefaultSymbols())
@@ -54,12 +54,30 @@ func main() {
 	}
 }
 
+func cleanArguments(args *cli.CliArguments) {
+	one := 1.0
+	if args.Scale == nil && args.ScaleX == nil && args.ScaleY == nil {
+		args.Scale = &one
+	}
+}
+
 func validateArguments(args cli.CliArguments) error {
 	if len(args.Filepaths) == 0 {
 		return fmt.Errorf("no input files provided")
 	}
-	if args.Scale <= 0 {
+	if args.Scale != nil && *args.Scale <= 0 {
 		return fmt.Errorf("scale must not be less or equal to zero")
 	}
+	if args.ScaleX != nil && *args.ScaleX <= 0 {
+		return fmt.Errorf("scaleX must not be less or equal to zero")
+	}
+	if args.ScaleY != nil && *args.ScaleY <= 0 {
+		return fmt.Errorf("scaleY must not be less or equal to zero")
+	}
+	if (args.ScaleX != nil && args.ScaleY == nil) ||
+		(args.ScaleX == nil && args.ScaleY != nil) {
+		return fmt.Errorf("when scaleX is set scaleY must also be set (and vice versa)")
+	}
+
 	return nil
 }
